@@ -1,17 +1,20 @@
-import { IsEmail, IsNumber, IsString, Min } from 'class-validator';
+import { IsEmail, IsInt, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateUserDto {
 
-	@IsNumber()
+	@Type(() => Number)
 	@Min(0, {
 		message: 'Balance can\'t be less than 0'
 	})
+	@IsInt()
 	balance: number;
 
-	@IsNumber()
+	@Type(() => Number)
 	@Min(0, {
 		message: 'Age can\'t be less than 0'
 	})
+	@IsInt()
 	age: number;
 
 	@IsString()

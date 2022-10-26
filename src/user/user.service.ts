@@ -3,11 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateUserDto } from './dto/CreateUserDto';
 import { UserModel } from './user.model';
-// import querystring from 'querystring';
-import * as queryString from 'query-string';
 import * as escapeString from 'escape-string';
 import { ISearchParams } from './user.controller';
-import e from 'express';
 
 @Injectable()
 export class UserService {
@@ -44,54 +41,48 @@ export class UserService {
 	}
 
 	private createFindParams(searchParams: ISearchParams) {
-		const { name, company, email, isActive, fromAge, toAge, fromBalance, toBalance } = searchParams;
+		const { searchInput, isActive, ageFrom, ageTo, balanceFrom, balanceTo } = searchParams;
 		const findParams: { [ index: string ]: any } = {};
-		if (name || company || email) {
-			const orParams = [];
-			if (name) {
-				const $regexName = new RegExp(escapeString.escapeString(searchParams.name));
-				orParams.push({
+		if (searchInput) {
+			const $regexSearchInput = new RegExp(escapeString.escapeString(searchParams.searchInput));
+			findParams['$or'] = [
+				{
 					name: {
-						$regex: $regexName,
+						$regex: $regexSearchInput,
 						$options: 'i',
 					}
-				});
-			}
-			if (company) {
-				const $regexName = new RegExp(escapeString.escapeString(searchParams.company));
-				orParams.push({
+				},
+				{
 					company: {
-						$regex: $regexName,
+						$regex: $regexSearchInput,
 						$options: 'i',
 					}
-				});
-			}
-
-			if (email) {
-				const $regexName = new RegExp(escapeString.escapeString(searchParams.email));
-				orParams.push({
+				},
+				{
 					email: {
-						$regex: $regexName,
+						$regex: $regexSearchInput,
 						$options: 'i',
 					}
-				})
-			}
-			findParams['$or'] = orParams;
+				}
+			];
 		}
 		if (isActive) {
 			findParams['isActive'] = isActive;
 		}
-		if (fromAge && toAge && fromAge < toAge) {
-			findParams['age'] = {
-				$gte: fromAge,
-				$lte: toAge,
-			}
+		if (ageFrom) {
+			if (!findParams.age) findParams.age = {};
+			findParams.age['$gte'] = ageFrom;
 		}
-		if (fromBalance && toBalance && fromBalance < toBalance) {
-			findParams['balance'] = {
-				$gte: fromBalance,
-				$lte: toBalance,
-			}
+		if (ageTo) {
+			if (!findParams.age) findParams.age = {};
+			findParams.age['$lte'] = ageTo;
+		}
+		if (balanceFrom) {
+			if (!findParams.balance) findParams.balance = {};
+			findParams.balance['$gte'] = balanceFrom;
+		}
+		if (balanceTo) {
+			findParams.balance['$lte'] = balanceTo;
 		}
 
 		return findParams;
@@ -138,17 +129,26 @@ export class UserService {
 		return sortParams;
 	}
 
-	search(searchParams: ISearchParams) {
+	async search(searchParams: ISearchParams) {
 		const findParams = this.createFindParams(searchParams);
 
 		const { skip = 0, limit = 10 } = searchParams;
 
 		const sortParams = this.configSortParams(searchParams);
 
-		return this.userModel.find(findParams)
-			.skip(skip)
-			.limit(limit)
-			.sort(sortParams)
+		const userInfo = await Promise.all([
+			this.userModel.find(findParams)
+				.skip(skip)
+				.limit(limit)
+				.sort(sortParams),
+			this.userModel.countDocuments(findParams)
+		]);
+
+		return {
+			users: userInfo[0],
+			userAmount: userInfo[1],
+		}
+
 	}
 
 }
